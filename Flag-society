@@ -1,0 +1,202 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+/* We keep one of these structures per user */
+typedef struct
+{
+	/* User name. All our users have really short names so I hope 8 characters is enough */
+	char name[8];
+
+	/* User birthday */
+	char day;
+	char month;
+	short year;
+
+	/* account type, should be "contestant" or "administrator" */
+	char account_type[20];
+} contestant_t;
+
+
+/* We support up to 64 users */
+member_t g_member_info[64];
+
+int g_member_num = 0;
+member_t *g_logged_in_member;
+
+
+void
+load_member_list (void)
+{
+	FILE *f = fopen ("/usr/share/member-list", "rb");
+
+	while (1)
+	{
+		member_t *new_member_info = g_member_info + g_member_num;
+
+		/* Read the member's information from the file */
+		if (fscanf (f, "%s %hhd %hhd %hd %s\n",
+			new_member_info->name,
+			&new_member_info->day,
+			&new_member_info->month,
+			&new_member_info->year,
+			new_member_info->account_type) != 5)
+		{
+			break;
+		}
+
+		g_member_num++;
+	}
+
+	fclose (f);
+}
+
+
+void
+print_members (void)
+{
+	int i;
+
+	printf ("Username                 D.O.B.                     Account type\n");
+	printf ("===================================================================\n");
+
+	for (i = 0; i < g_member_num; i++)
+	{
+		printf ("%-8s                 %02d/%02d/%04d                 %s\n",
+			g_member_info[i].name,
+			g_member_info[i].day,
+			g_member_info[i].month,
+			g_member_info[i].year,
+			g_member_info[i].account_type);
+	}
+
+}
+
+
+void
+add_member (void)
+{
+ 	member_t *new_member_info = g_member_info + g_member_num;
+
+	/* New users are always going to be contestants and never administrators */
+	strcpy (new_member_info->account_type, "contestant");
+
+	printf ("\n");
+	printf ("Enter your date of birth (dd/mm/yyyy): ");
+
+	if (fscanf (stdin, "%hhd/%hhd/%hd",
+		&new_member_info->day,
+		&new_member_info->month,
+		&new_member_info->year) != 3)
+	{
+		printf ("Sorry, I didn't understand that!\n");
+		exit (0);
+	}
+
+	printf ("Enter your name: ");
+
+	if (fscanf (stdin, "%s", new_member_info->name) != 1)
+	{
+		printf ("Sorry, I didn't understand that!\n");
+		exit (0);
+	}
+
+
+	g_logged_in_member = new_member_info;
+
+	g_member_num++;
+}
+
+
+void
+print_flag (void)
+{
+	/* Make sure the user is allowed to see the flag first */
+	if (strcmp (g_logged_in_member->account_type, "contestant") != 0)
+	{
+		execl ("/home/cyberfirst/print-flag", NULL, NULL);
+        
+        return
+}
+
+	/* Great, print the flag */
+	execl ("/home/cyberfirst/print-flag", NULL, NULL);
+}
+
+
+void
+menu ()
+{
+	char input[32];
+
+	printf ("\n");
+	printf ("What would you like to do, %s?\n", g_logged_in_member->name);
+	printf ("    1) Login as a different user\n");
+	printf ("    2) List users\n");
+	printf ("    3) Print flag\n");
+	printf ("    4) Logout\n");
+	printf ("\n");
+	printf ("Your choice: ");
+
+	fscanf (stdin, "%s", input);
+
+	printf ("\n");
+
+	switch (atoi (input))
+	{
+		case 1:
+			add_member ();
+			break;
+
+		case 2:
+			print_members ();
+			break;
+
+		case 3:
+			print_flag ();
+			break;
+
+		case 4:
+			printf ("Goodbye!\n\n");
+			exit (0);
+
+		default:
+			printf ("Invalid selection!\n");
+	}
+}
+
+
+int
+main (int argc, char *argv[])
+{
+	member_t *new_member_info;
+	char input[16];
+
+	setbuf (stdout, NULL);
+
+	load_member_list ();
+	
+	printf ("\n");
+	printf ("Welcome to the Flag Society!\n");
+	printf ("\n");
+	printf ("Would you like to join? (y/n) ");
+
+	fscanf (stdin, "%s", input);
+
+	/* Quit if the user doesn't want to join */
+	if (strncasecmp (input, "y", 1) != 0)
+	{
+		printf ("Goodbye!\n\n");
+		exit (0);
+	}
+
+	add_member ();
+
+	while (1)
+	{
+		menu ();
+	}
+
+	return 0;
+}
